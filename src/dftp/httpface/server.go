@@ -5,7 +5,7 @@ package httpface
 * Functions:
 *   - directory browser
 *   - file downloader
-*/
+ */
 
 import (
 	"dftp/dfsfat"
@@ -16,6 +16,7 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ type Server struct {
 func (s *Server) ServeHttp(addr string) {
 	httpHandleFunc("/", s.Index)
 	httpHandleFunc("/fs/", s.Fs)
+	httpHandleFunc("/find/", s.Find)
 	log.Printf("HTTP public interface listening on %s...", addr)
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatalf("http: %s", err)
@@ -39,6 +41,16 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, `Hi! See /fs/ for filesystem browser.`, 200)
 }
 
+// Display full distributed filesystem listing as plain text
+func (s *Server) Find(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	s.DfsRoot.Walk(func(path string, info os.FileInfo, _ error) error {
+		fmt.Fprintf(w, "%s\r\n", path)
+		return nil
+	})
+}
+
+// Display directory listing or serve a single file
 func (s *Server) Fs(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/fs/")
 	path = strings.TrimSuffix(path, "/")
