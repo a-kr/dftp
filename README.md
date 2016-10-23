@@ -53,12 +53,12 @@ Now you have a unified distributed file system, the contents of which can be lis
   
 ```
 # curl -s http://server1:7040/find/
-test.txt
-megafile.tar.gz
-somedir/a.txt
-somedir/c.jpg
-somedir/nested/zzz.bak
-somedir/g.gif
+/test.txt
+/megafile.tar.gz
+/somedir/a.txt
+/somedir/c.jpg
+/somedir/nested/zzz.bak
+/somedir/g.gif
 ```
 
 Querying `server2` will yield the same response.
