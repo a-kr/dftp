@@ -10,6 +10,7 @@ The project is still in very early stages of development.
 
 * [done] Read-only HTTP proxy for local file system.
 * [done] Read-only HTTP proxy for a distributed file system.
+* Implement peer discovery based on multicast UDP messages.
 * Implement periodic updates and local filesystem changes monitoring.
 * Implement read-only FTP interface.
 * Implement write operations for HTTP and FTP.
@@ -82,6 +83,8 @@ bin/dftp --help
 
 ## HTTP API
 
+Public HTTP API is available by default on port `:7040`.
+
 * `GET /`
 
 Displays simple greeting page.
@@ -102,3 +105,79 @@ as a `text/plain` newline-separated response. For large filesystems this command
 
 Returned filenames do not start with "/", but are relative to the root directory of the distributed file system.
 
+
+## Internal cluster communication
+
+Peer to peer communication happens over HTTP on port `:7041`.
+
+* Every node speaks to every other node directly. No 'masters' are elected.
+* A new node joins cluster by _greeting_ (`POST /cluster/`) any known node. The new node receives a list of cluster nodes in return. The new node then _greets_ every other node in the list and requests _full updates_ from each of them.
+* An _update_ is a list of files (and their attributes) local to the sender node. A _full update_ contains all files; by contrast, an incremental update contains only some of them (e.g. files which have been changed since last full update).
+* A node is responsible for pushing updates to every other node. These updates are not propagated further.
+* Every node stores a complete tree representation of the distributed file system, and maintains it by both receiving updates from other nodes and scanning its own local filesystem.
+* [TODO] Every node sends incremental updates upon observing changes in the local filesystem. Every node also sends full updates periodically (every hour by default).
+* [TODO] Upon receiving a _full update_, a node prunes all files which were marked to belong to sender node, but are not contained in the full update. Thus file deletion is handled.
+* [TODO] Every node periodically pings every other node with `POST /cluster/` request without requesting a full update. Nodes which do not respond to such request are removed from cluster, along with all the files they own.
+* If several nodes contain a file with the same path locally, the file will be considered belonging to that node which has sent the more recent update containing this file. File modification time and other attributes are not considered in conflict resolution.
+* The described distributed system is _eventually consistent_ with regard to file information.
+
+Description of the cluster management API follows.
+
+* `POST /join/`
+
+Used to bootstrap a cluster joining process for new nodes. Required form parameter is `peer`, which must contain an address of any other cluster node's management API endpoint in the form of `<host>:<port>` (where port is usually 7041). Upon receiving this command, the node sends a _greeting_ to specified node.
+
+* `GET /cluster/`
+
+Returns information about the node (name, public API address, management API address), and a list of other cluster nodes, with the same attributes.
+
+* `POST /cluster/`
+
+Sends a _greeting_, asking the node to update information on the caller. Form parameters are:
+
+  1. `name`: name of the calling node;
+  2. `public-addr`: address of public HTTP API endpoint, in the form of `<host>:<port>`, where `<host>` may be empty;
+  3. `mgmt-addr`: address of management HTTP API endpoint;
+  4. `request-full-update`, optional. If equals `true`, the node must push a _full update_ to the calling node, by sending a `POST /update/` request asynchronously after processing the greeting request.
+  
+Response is the same as for `GET /cluster/`.
+  
+* `POST /update/`
+
+Sends an _update_, asking the node to amend its information about files and attributes. POST body must be a JSON document:
+```
+{
+  "SenderNodeName": "server1",
+  "Full": true,
+  "UpdateTime": 1477224426,
+  "Files": [
+    {
+      "Deletion": false,
+      "FullName": "somefolder",
+      "Basename": "somefolder",
+      "Dir": true,
+      "LastModified": 1476551310,
+      "LastInfoUpdated": 1477224426,
+      "SizeInBytes": 0,
+      "FileMode": 2147484141,
+      "OwnerNode": "server1"
+    },
+    {
+      "Deletion": false,
+      "FullName": "somefolder/test.txt",
+      "Basename": "test.txt",
+      "Dir": false,
+      "LastModified": 1476551310,
+      "LastInfoUpdated": 1477224426,
+      "SizeInBytes": 123,
+      "FileMode": 2147484141,
+      "OwnerNode": "server1"
+    },
+    ...
+  ]
+}
+```
+
+The order of files is arbitrary. Directories may be skipped; they are created on the fly upon encountering any files contained within. If `"Deletion"` is true, the node treats the item as file removal notification and makes the file unavailable for reading.
+
+Upon successful parsing of the update request, the node responds with simple "ok" and starts applying updates to its own copy of filesystem tree asynchronously.
