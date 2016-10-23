@@ -11,6 +11,10 @@ import (
 	"sync"
 )
 
+const (
+	MultipleNodeOwners = "(multiple)"
+)
+
 type TreeNode struct {
 	sync.RWMutex
 	fileStat   FileStat

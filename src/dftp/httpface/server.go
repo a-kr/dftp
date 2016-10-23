@@ -133,9 +133,10 @@ func (s *Server) Fs(w http.ResponseWriter, r *http.Request) {
 			txtLink = fmt.Sprintf(`<a href="%s?format=txt" title="view as plain text">txt</a>`, name)
 		} else {
 			sz = "[DIR]"
+			txtLink = "   "
 		}
 
-		fmt.Fprintf(w, `<a href="%s">%s</a>%s%20s%20s %5s   %s`+"\r\n", name, displayName, spaces, dt, sz, txtLink, entryStat.OwnerNode)
+		fmt.Fprintf(w, `<a href="%s">%s</a>%s%20s%20s %s   %s`+"\r\n", name, displayName, spaces, dt, sz, txtLink, entryStat.OwnerNode)
 	}
 	fmt.Fprintf(w, `</pre><hr/></body></html>`)
 }

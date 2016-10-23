@@ -104,7 +104,12 @@ func (n *TreeNode) update(files []*FileAnnouncement) {
 				entry.Lock()
 				// TODO check if file actually changed
 				if fa.LastInfoUpdated > entry.fileStat.LastInfoUpdated {
+					prevOwner := entry.fileStat.OwnerNode
 					entry.fileStat = fa.FileStat
+					if fa.FileStat.Dir && prevOwner != "" && prevOwner != fa.FileStat.OwnerNode {
+						entry.fileStat.OwnerNode = MultipleNodeOwners
+						// TODO: maybe file moved from one node to another? Need periodic ownership recalculation.
+					}
 				}
 				entry.Unlock()
 			}
@@ -113,6 +118,7 @@ func (n *TreeNode) update(files []*FileAnnouncement) {
 		if len(nestedFiles) > 0 {
 			entry.setAsDir()
 			entry.update(nestedFiles)
+			entry.recalculateOwner()
 		}
 	}
 }
@@ -121,9 +127,26 @@ func (n *TreeNode) setAsDir() {
 	n.Lock()
 	defer n.Unlock()
 	n.fileStat.Dir = true
-	n.fileStat.OwnerNode = ""
 	n.fileStat.SizeInBytes = 0
 	if n.childNodes == nil {
 		n.childNodes = make(map[string]*TreeNode)
 	}
+}
+
+func (n *TreeNode) recalculateOwner() {
+	owner := ""
+	n.Lock()
+	defer n.Unlock()
+	if !n.fileStat.Dir {
+		return
+	}
+	for _, e := range n.childNodes {
+		stat := e.GetFilestat()
+		if owner == "" {
+			owner = stat.OwnerNode
+		} else if owner != stat.OwnerNode {
+			owner = MultipleNodeOwners
+		}
+	}
+	n.fileStat.OwnerNode = owner
 }
