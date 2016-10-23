@@ -2,7 +2,7 @@ package cluster
 
 import (
 	"dftp/dfsfat"
-	"dftp/httputil"
+	"dftp/httputils"
 	"dftp/localfs"
 	"net/http"
 	"sync"
@@ -66,6 +66,6 @@ func New(dfs *dfsfat.TreeNode, localfs *localfs.LocalFs, publicAddr string, mgmt
 		MgmtAddr:   mgmtAddr,
 		LastAlive:  time.Now().Unix(),
 	}
-	c.client = httputil.MakeTimeoutingHttpClient(3 * time.Second)
+	c.client = httputils.MakeTimeoutingHttpClient(3 * time.Second)
 	return c
 }

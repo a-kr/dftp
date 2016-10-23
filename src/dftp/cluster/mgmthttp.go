@@ -1,7 +1,7 @@
 package cluster
 
 import (
-	"dftp/httputil"
+	"dftp/httputils"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -14,10 +14,10 @@ import (
 
 func (c *Cluster) ServeHttp(addr string) {
 	c.mux = http.NewServeMux()
-	httputil.HandleFunc(c.mux, "/", c.HttpIndex)
-	httputil.HandleFunc(c.mux, "/cluster/", c.HttpCluster)
-	httputil.HandleFunc(c.mux, "/join/", c.HttpJoin)
-	httputil.HandleFunc(c.mux, "/update/", c.HttpUpdate)
+	httputils.HandleFunc(c.mux, "/", c.HttpIndex)
+	httputils.HandleFunc(c.mux, "/cluster/", c.HttpCluster)
+	httputils.HandleFunc(c.mux, "/join/", c.HttpJoin)
+	httputils.HandleFunc(c.mux, "/update/", c.HttpUpdate)
 	log.Printf("HTTP mgmt interface listening on %s...", addr)
 	if err := http.ListenAndServe(addr, c.mux); err != nil {
 		log.Fatalf("http: %s", err)

@@ -10,7 +10,7 @@ package httpface
 import (
 	"dftp/cluster"
 	"dftp/dfsfat"
-	"dftp/httputil"
+	"dftp/httputils"
 	"dftp/localfs"
 	"dftp/utils"
 	"fmt"
@@ -18,28 +18,62 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
+const (
+	MaxRedirectDepth = 2
+)
+
 type Server struct {
-	DfsRoot *dfsfat.TreeNode
-	LocalFs *localfs.LocalFs
-	Cluster *cluster.Cluster
-	mux     *http.ServeMux
+	DfsRoot      *dfsfat.TreeNode
+	LocalFs      *localfs.LocalFs
+	Cluster      *cluster.Cluster
+	mux          *http.ServeMux
+	proxiesMutex sync.Mutex
+	proxies      map[string]*httputil.ReverseProxy
 }
 
 func (s *Server) ServeHttp(addr string) {
+	s.proxies = make(map[string]*httputil.ReverseProxy)
 	s.mux = http.NewServeMux()
-	httputil.HandleFunc(s.mux, "/", s.Index)
-	httputil.HandleFunc(s.mux, "/fs/", s.Fs)
-	httputil.HandleFunc(s.mux, "/find/", s.Find)
+	httputils.HandleFunc(s.mux, "/", s.Index)
+	httputils.HandleFunc(s.mux, "/fs/", s.Fs)
+	httputils.HandleFunc(s.mux, "/find/", s.Find)
 	log.Printf("HTTP public interface listening on %s...", addr)
 	if err := http.ListenAndServe(addr, s.mux); err != nil {
 		log.Fatalf("http: %s", err)
 	}
+}
+
+func (s *Server) getProxy(nodeName string) *httputil.ReverseProxy {
+	s.proxiesMutex.Lock()
+	defer s.proxiesMutex.Unlock()
+	proxy, ok := s.proxies[nodeName]
+	if !ok {
+		s.Cluster.RLock()
+		node, ok := s.Cluster.Peers[nodeName]
+		s.Cluster.RUnlock()
+		if !ok {
+			return nil
+		}
+
+		proxy = &httputil.ReverseProxy{}
+		proxy.Director = func(r *http.Request) {
+			r.URL.Scheme = "http"
+			r.URL.Host = node.PublicAddr
+			log.Printf("Proxy download request to %s", r.URL)
+		}
+		s.proxies[nodeName] = proxy
+
+	}
+	return proxy
 }
 
 func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
@@ -163,6 +197,21 @@ func (s *Server) ServeFile(w http.ResponseWriter, r *http.Request, path string, 
 		}
 		return
 	}
-	http.Error(w, fmt.Sprintf("file resides on `%s`; serving from other hosts not implemented yet.", entry.OwnerNode), 500)
-	return
+
+	redirN, err := strconv.Atoi(r.FormValue("redirN"))
+	if err != nil {
+		redirN = 0
+	}
+	if redirN >= MaxRedirectDepth {
+		http.Error(w, "too many proxy redirects while serving the file", 502)
+		return
+	}
+	redirN += 1
+
+	proxy := s.getProxy(entry.OwnerNode)
+	if proxy == nil {
+		http.Error(w, fmt.Sprintf("file resides on unknown node `%s`", entry.OwnerNode), 404)
+		return
+	}
+	proxy.ServeHTTP(w, r)
 }
