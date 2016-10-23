@@ -103,7 +103,7 @@ Otherwise, serves the file contents as HTTP response, guessing Content-Type from
 Returns complete list of full filenames for every file in the distributed file system, much like Unix `find` command does,
 as a `text/plain` newline-separated response. For large filesystems this command may take quite a while to execute.
 
-Returned filenames do not start with "/", but are relative to the root directory of the distributed file system.
+Returned filenames start with "/" and are relative to the root directory of the distributed file system.
 
 
 ## Internal cluster communication

@@ -84,7 +84,7 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 func (s *Server) Find(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	s.DfsRoot.Walk(func(path string, info os.FileInfo, _ error) error {
-		fmt.Fprintf(w, "%s\r\n", path)
+		fmt.Fprintf(w, "/%s\r\n", path)
 		return nil
 	})
 }
