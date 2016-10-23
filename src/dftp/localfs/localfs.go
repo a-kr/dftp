@@ -2,7 +2,7 @@ package localfs
 
 /*
 * Local file system manager and scanner
-*/
+ */
 
 import (
 	"dftp/dfsfat"
@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 type LocalFs struct {
@@ -18,6 +19,10 @@ type LocalFs struct {
 	DfsMountPoint string
 	DfsRoot       *dfsfat.TreeNode
 	MyNodeName    string
+
+	lastScanMutex    sync.RWMutex
+	LastFullScan     []*dfsfat.FileAnnouncement
+	LastFullScanTime int64
 }
 
 func NewLocalFs(localRoot string, dfsMountPoint string, dfsRoot *dfsfat.TreeNode, myNodeName string) *LocalFs {
@@ -34,6 +39,12 @@ func NewLocalFs(localRoot string, dfsMountPoint string, dfsRoot *dfsfat.TreeNode
 		s.LocalRoot += "/"
 	}
 	return s
+}
+
+func (fs *LocalFs) GetLastFullScan() ([]*dfsfat.FileAnnouncement, int64) {
+	fs.lastScanMutex.RLock()
+	defer fs.lastScanMutex.RUnlock()
+	return fs.LastFullScan, fs.LastFullScanTime
 }
 
 var (

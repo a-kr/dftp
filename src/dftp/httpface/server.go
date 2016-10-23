@@ -8,7 +8,9 @@ package httpface
  */
 
 import (
+	"dftp/cluster"
 	"dftp/dfsfat"
+	"dftp/httputil"
 	"dftp/localfs"
 	"dftp/utils"
 	"fmt"
@@ -25,14 +27,17 @@ import (
 type Server struct {
 	DfsRoot *dfsfat.TreeNode
 	LocalFs *localfs.LocalFs
+	Cluster *cluster.Cluster
+	mux     *http.ServeMux
 }
 
 func (s *Server) ServeHttp(addr string) {
-	httpHandleFunc("/", s.Index)
-	httpHandleFunc("/fs/", s.Fs)
-	httpHandleFunc("/find/", s.Find)
+	s.mux = http.NewServeMux()
+	httputil.HandleFunc(s.mux, "/", s.Index)
+	httputil.HandleFunc(s.mux, "/fs/", s.Fs)
+	httputil.HandleFunc(s.mux, "/find/", s.Find)
 	log.Printf("HTTP public interface listening on %s...", addr)
-	if err := http.ListenAndServe(addr, nil); err != nil {
+	if err := http.ListenAndServe(addr, s.mux); err != nil {
 		log.Fatalf("http: %s", err)
 	}
 }
@@ -159,24 +164,4 @@ func (s *Server) ServeFile(w http.ResponseWriter, r *http.Request, path string, 
 	}
 	http.Error(w, fmt.Sprintf("file resides on `%s`; serving from other hosts not implemented yet.", entry.OwnerNode), 500)
 	return
-}
-
-func httpHandleFunc(url string, handler func(http.ResponseWriter, *http.Request)) {
-	handler = panicCatcherMiddleware(handler)
-
-	http.HandleFunc(url, handler)
-}
-
-func panicCatcherMiddleware(next func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if x := recover(); x != nil {
-				stack := utils.GetTraceback()
-				errinfo := fmt.Sprintf("ERROR: PANIC: %s\n%s", x, stack)
-				log.Printf("%s", errinfo)
-				http.Error(rw, errinfo, 500)
-			}
-		}()
-		next(rw, r)
-	}
 }

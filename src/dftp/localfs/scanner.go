@@ -40,10 +40,17 @@ func (s *LocalFs) ScanOnce() {
 		}
 		return nil
 	})
-	if err != nil {
-		log.Printf("Scanner: scan error: %s", err)
-	}
-
 	log.Printf("Scanner: local scan finished, %d file(s) found", len(files))
-	s.DfsRoot.Update(files)
+	if err != nil {
+		log.Fatalf("Scanner: scan error: %s", err)
+	} else {
+		s.lastScanMutex.Lock()
+		s.LastFullScan = files
+		s.LastFullScanTime = scanT
+		s.lastScanMutex.Unlock()
+
+		s.DfsRoot.Update(files)
+
+		// TODO: notify peers if partial update is available
+	}
 }

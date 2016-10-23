@@ -9,7 +9,8 @@ The project is still in very early stages of development.
 ## Roadmap
 
 * [done] Read-only HTTP proxy for local file system.
-* Read-only HTTP proxy for a distributed file system.
+* [done] Read-only HTTP proxy for a distributed file system.
+* Implement periodic updates and local filesystem changes monitoring.
 * Implement read-only FTP interface.
 * Implement write operations for HTTP and FTP.
 
@@ -18,7 +19,7 @@ The project is still in very early stages of development.
 Suppose you have two machines, `server1` and `server2`, and want to setup a distributed file system
 which will contain directory trees from `/storage` and `/data` folders on these machines.
 
-On `server1`:
+Start dftp on `server1`:
 
 ```
 # find /storage
@@ -28,8 +29,9 @@ On `server1`:
 # dftp --dfsroot=/storage
 2016/10/22 22:08:01 Scanner: local scan finished, 3 file(s) found
 2016/10/22 22:08:01 HTTP public interface listening on :7040...
+2016/10/22 22:08:01 HTTP mgmt interface listening on :7041...
 ```
-On `server2`:
+...And on `server2`:
 ```
 # find /data
 /data/megafile.tar.gz
@@ -38,7 +40,14 @@ On `server2`:
 # dftp --dfsroot=/data
 2016/10/22 22:09:26 Scanner: local scan finished, 3 file(s) found
 2016/10/22 22:09:26 HTTP public interface listening on :7040...
+2016/10/22 22:09:26 HTTP mgmt interface listening on :7041...
 ```
+
+Ask one node to join the other:
+```
+# curl -d 'peer=server2:7041' http://server1:7041/join/
+```
+
 Now you have a unified distributed file system, the contents of which can be listed using e.g. `/find/` API:
   
 ```

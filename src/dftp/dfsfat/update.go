@@ -2,7 +2,7 @@ package dfsfat
 
 /*
 * Filesystem tree update algorithm
-*/
+ */
 
 import (
 	"log"
