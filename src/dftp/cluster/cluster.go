@@ -19,6 +19,8 @@ type Cluster struct {
 	DfsRoot *dfsfat.TreeNode
 	LocalFs *localfs.LocalFs
 
+	Proxy *Proxy
+
 	client *http.Client
 
 	mux *http.ServeMux
@@ -59,6 +61,7 @@ func New(dfs *dfsfat.TreeNode, localfs *localfs.LocalFs, publicAddr string, mgmt
 	c := &Cluster{}
 	c.DfsRoot = dfs
 	c.LocalFs = localfs
+	c.Proxy = NewProxy(c, localfs)
 	c.Peers = make(map[string]*NodeInfo)
 	c.Me = &NodeInfo{
 		Name:       localfs.MyNodeName,

@@ -11,19 +11,16 @@ import (
 	"dftp/cluster"
 	"dftp/dfsfat"
 	"dftp/httputils"
-	"dftp/localfs"
 	"dftp/utils"
 	"fmt"
 	"io"
 	"log"
 	"mime"
 	"net/http"
-	"net/http/httputil"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -32,16 +29,12 @@ const (
 )
 
 type Server struct {
-	DfsRoot      *dfsfat.TreeNode
-	LocalFs      *localfs.LocalFs
-	Cluster      *cluster.Cluster
-	mux          *http.ServeMux
-	proxiesMutex sync.Mutex
-	proxies      map[string]*httputil.ReverseProxy
+	DfsRoot *dfsfat.TreeNode
+	Cluster *cluster.Cluster
+	mux     *http.ServeMux
 }
 
 func (s *Server) ServeHttp(addr string) {
-	s.proxies = make(map[string]*httputil.ReverseProxy)
 	s.mux = http.NewServeMux()
 	httputils.HandleFunc(s.mux, "/", s.Index)
 	httputils.HandleFunc(s.mux, "/fs/", s.Fs)
@@ -50,30 +43,6 @@ func (s *Server) ServeHttp(addr string) {
 	if err := http.ListenAndServe(addr, s.mux); err != nil {
 		log.Fatalf("http: %s", err)
 	}
-}
-
-func (s *Server) getProxy(nodeName string) *httputil.ReverseProxy {
-	s.proxiesMutex.Lock()
-	defer s.proxiesMutex.Unlock()
-	proxy, ok := s.proxies[nodeName]
-	if !ok {
-		s.Cluster.RLock()
-		node, ok := s.Cluster.Peers[nodeName]
-		s.Cluster.RUnlock()
-		if !ok {
-			return nil
-		}
-
-		proxy = &httputil.ReverseProxy{}
-		proxy.Director = func(r *http.Request) {
-			r.URL.Scheme = "http"
-			r.URL.Host = node.PublicAddr
-			log.Printf("Proxy download request to %s", r.URL)
-		}
-		s.proxies[nodeName] = proxy
-
-	}
-	return proxy
 }
 
 func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
@@ -176,8 +145,8 @@ func (s *Server) Fs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ServeFile(w http.ResponseWriter, r *http.Request, path string, entry *dfsfat.TreeNodeReadonly) {
-	if entry.OwnerNode == s.LocalFs.MyNodeName {
-		f, err := s.LocalFs.OpenRead(path)
+	if entry.OwnerNode == s.Cluster.LocalFs.MyNodeName {
+		f, err := s.Cluster.LocalFs.OpenRead(path)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -208,7 +177,7 @@ func (s *Server) ServeFile(w http.ResponseWriter, r *http.Request, path string, 
 	}
 	redirN += 1
 
-	proxy := s.getProxy(entry.OwnerNode)
+	proxy := s.Cluster.Proxy.GetHttpProxy(entry.OwnerNode)
 	if proxy == nil {
 		http.Error(w, fmt.Sprintf("file resides on unknown node `%s`", entry.OwnerNode), 404)
 		return
