@@ -10,9 +10,9 @@ The project is still in very early stages of development.
 
 * [done] Read-only HTTP proxy for local file system.
 * [done] Read-only HTTP proxy for a distributed file system.
+* [done] Implement read-only FTP interface.
 * Implement peer discovery based on multicast UDP messages.
 * Implement periodic updates and local filesystem changes monitoring.
-* Implement read-only FTP interface.
 * Implement write operations for HTTP and FTP.
 
 ## Example

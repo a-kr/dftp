@@ -3,6 +3,7 @@ package main
 import (
 	"dftp/cluster"
 	"dftp/dfsfat"
+	"dftp/ftpface"
 	"dftp/httpface"
 	"dftp/localfs"
 	"flag"
@@ -16,6 +17,7 @@ var (
 	optDfsMountPoint = flag.String("dfsmount", "", "path inside DFS where local tree will be mounted (not necessarily unique path)")
 	optMyNodeName    = flag.String("node-name", "", "node name to use instead of hostname")
 	optHttpAddr      = flag.String("http-listen", ":7040", "host:port for public HTTP interface to listen on")
+	optFtpAddr       = flag.String("ftp-listen", ":2121", "host:port for public FTP interface to listen on")
 	optHttpMgmtAddr  = flag.String("http-mgmt-listen", ":7041", "host:port for private cluster management HTTP interface to listen on")
 )
 
@@ -44,18 +46,18 @@ func main() {
 	if *optHttpAddr != "" {
 		server := httpface.Server{
 			DfsRoot: dfs,
-			LocalFs: localfs,
 			Cluster: cluster,
 		}
 		go server.ServeHttp(*optHttpAddr)
 	}
 
-	/*
-		dfs.Walk(func(path string, info os.FileInfo, _ error) error {
-			log.Printf("%s: %v", path, info.Name())
-			return nil
-		})
-	*/
+	if *optFtpAddr != "" {
+		server := ftpface.Server{
+			DfsRoot: dfs,
+			Cluster: cluster,
+		}
+		go server.ServeFtp(*optFtpAddr)
+	}
 
 	for {
 		time.Sleep(1 * time.Second)

@@ -34,3 +34,13 @@ func (fs *FileStat) Sys() interface{} {
 func (fs *FileStat) IsDeleted() bool {
 	return fs.SizeInBytes < 0
 }
+
+// Additional methods to implement goftp.FileInfo
+
+func (fs *FileStat) Owner() string {
+	return "dftp"
+}
+
+func (fs *FileStat) Group() string {
+	return "dftp"
+}

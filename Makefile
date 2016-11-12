@@ -2,7 +2,7 @@ BIN=dftp
 
 .PHONY: $(BIN) test run fmt clean
 
-export GOPATH:=$(shell pwd)
+export GOPATH:=$(shell pwd)/_vendor:$(shell pwd)
 export CWD:=$(shell pwd)
 
 $(BIN):
@@ -10,6 +10,9 @@ $(BIN):
 
 run: $(BIN)
 	bin/$(BIN) --dfsroot=/storage/www
+
+_vendor:
+	go get github.com/goftp/server
 
 clean:
 	rm -f bin/$(BIN)

@@ -69,6 +69,6 @@ func New(dfs *dfsfat.TreeNode, localfs *localfs.LocalFs, publicAddr string, mgmt
 		MgmtAddr:   mgmtAddr,
 		LastAlive:  time.Now().Unix(),
 	}
-	c.client = httputils.MakeTimeoutingHttpClient(3 * time.Second)
+	c.client = httputils.MakeTimeoutingHttpClient(10 * time.Second)
 	return c
 }

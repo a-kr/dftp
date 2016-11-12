@@ -24,10 +24,6 @@ import (
 	"time"
 )
 
-const (
-	MaxRedirectDepth = 2
-)
-
 type Server struct {
 	DfsRoot *dfsfat.TreeNode
 	Cluster *cluster.Cluster
@@ -145,42 +141,28 @@ func (s *Server) Fs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ServeFile(w http.ResponseWriter, r *http.Request, path string, entry *dfsfat.TreeNodeReadonly) {
-	if entry.OwnerNode == s.Cluster.LocalFs.MyNodeName {
-		f, err := s.Cluster.LocalFs.OpenRead(path)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		defer f.Close()
-
-		ctype := mime.TypeByExtension(filepath.Ext(path))
-		if r.FormValue("format") == "txt" {
-			ctype = "text/plain; charset=utf-8"
-		}
-		if ctype != "" {
-			w.Header().Set("Content-Type", ctype)
-		}
-		_, err = io.Copy(w, f)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-		}
-		return
-	}
-
 	redirN, err := strconv.Atoi(r.FormValue("redirN"))
 	if err != nil {
 		redirN = 0
 	}
-	if redirN >= MaxRedirectDepth {
-		http.Error(w, "too many proxy redirects while serving the file", 502)
-		return
-	}
-	redirN += 1
 
-	proxy := s.Cluster.Proxy.GetHttpProxy(entry.OwnerNode)
-	if proxy == nil {
-		http.Error(w, fmt.Sprintf("file resides on unknown node `%s`", entry.OwnerNode), 404)
+	f, err := s.Cluster.Proxy.OpenRead(path, entry, redirN)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
 		return
 	}
-	proxy.ServeHTTP(w, r)
+	defer f.Close()
+
+	ctype := mime.TypeByExtension(filepath.Ext(path))
+	if r.FormValue("format") == "txt" {
+		ctype = "text/plain; charset=utf-8"
+	}
+	if ctype != "" {
+		w.Header().Set("Content-Type", ctype)
+	}
+	_, err = io.Copy(w, f)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+	}
+	return
 }
