@@ -11,7 +11,7 @@ The project is still in very early stages of development.
 * [done] Read-only HTTP proxy for local file system.
 * [done] Read-only HTTP proxy for a distributed file system.
 * [done] Implement read-only FTP interface.
-* Implement peer discovery based on multicast UDP messages.
+* [done] Implement peer discovery based on multicast UDP messages.
 * Implement periodic updates and local filesystem changes monitoring.
 * Implement write operations for HTTP and FTP.
 
@@ -31,6 +31,7 @@ Start dftp on `server1`:
 2016/10/22 22:08:01 Scanner: local scan finished, 3 file(s) found
 2016/10/22 22:08:01 HTTP public interface listening on :7040...
 2016/10/22 22:08:01 HTTP mgmt interface listening on :7041...
+2016/10/22 22:08:01 FTP public interface listening on :2121...
 ```
 ...And on `server2`:
 ```
@@ -42,15 +43,16 @@ Start dftp on `server1`:
 2016/10/22 22:09:26 Scanner: local scan finished, 3 file(s) found
 2016/10/22 22:09:26 HTTP public interface listening on :7040...
 2016/10/22 22:09:26 HTTP mgmt interface listening on :7041...
+2016/10/22 22:09:26 FTP public interface listening on :2121...
 ```
 
-Ask one node to join the other:
+Nodes will automatically discover each other via multicast. Alternatively, you can manually ask one node to join the other:
 ```
 # curl -d 'peer=server2:7041' http://server1:7041/join/
 ```
 
 Now you have a unified distributed file system, the contents of which can be listed using e.g. `/find/` API:
-  
+
 ```
 # curl -s http://server1:7040/find/
 /test.txt
@@ -81,6 +83,29 @@ make
 bin/dftp --help
 ```
 
+## Command line options
+
+```
+Usage of bin/dftp:
+  -cluster-name string
+        cluster name (change it to allow multiple separate clusters work with same multicast discovery address) (default "dftp")
+  -dfsmount string
+        path inside DFS where local tree will be mounted (not necessarily unique path)
+  -dfsroot string
+        local directory corresponding to local DFS root
+  -ftp-listen string
+        host:port for public FTP interface to listen on (default ":2121")
+  -http-listen string
+        host:port for public HTTP interface to listen on (default ":7040")
+  -http-mgmt-listen string
+        host:port for private cluster management HTTP interface to listen on (default ":7041")
+  -multicast-discovery-addr string
+        host:port for multicast peer discovery address (default "224.0.0.9:7041")
+  -node-name string
+        node name to use instead of hostname
+
+```
+
 ## HTTP API
 
 Public HTTP API is available by default on port `:7040`.
@@ -106,6 +131,16 @@ as a `text/plain` newline-separated response. For large filesystems this command
 Returned filenames start with "/" and are relative to the root directory of the distributed file system.
 
 
+## Peer discovery
+
+`dftp` supports automatic peer discovery via multicast, and manual discovery using `POST /join/` HTTP requests.
+
+Multicast discovery is enabled by default. Each node periodically (every minute) announces its name, management API address:port, and cluster name. When a node receives such announcement from a previously-unmet peer, the node _greets_ the peer (`POST /cluster/ request to peer's management API, which is detailed below).
+
+Multicast address and port can be specified with `--multicast-discovery-addr` command line option. If for some reason you need to operate multiple separate clusters on the same address and port, you must specify a different `--cluster-name` for each cluster.
+
+Multicast is not used for anything other than peer discovery.
+
 ## Internal cluster communication
 
 Peer to peer communication happens over HTTP on port `:7041`.
@@ -125,7 +160,13 @@ Description of the cluster management API follows.
 
 * `POST /join/`
 
-Used to bootstrap a cluster joining process for new nodes. Required form parameter is `peer`, which must contain an address of any other cluster node's management API endpoint in the form of `<host>:<port>` (where port is usually 7041). Upon receiving this command, the node sends a _greeting_ to specified node.
+Used to bootstrap peer discovery process for new nodes if for some reason multicast discovery is not enough. Required form parameter is `peer`, which must contain an address of any other cluster node's management API endpoint in the form of `<host>:<port>` (where port is usually 7041). Upon receiving this command, the node sends a _greeting_ to specified node.
+
+Example:
+
+```
+curl -d 'peer=server2.org:7041' http://server1.org:7041/join/
+```
 
 * `GET /cluster/`
 
@@ -139,9 +180,9 @@ Sends a _greeting_, asking the node to update information on the caller. Form pa
   2. `public-addr`: address of public HTTP API endpoint, in the form of `<host>:<port>`, where `<host>` may be empty;
   3. `mgmt-addr`: address of management HTTP API endpoint;
   4. `request-full-update`, optional. If equals `true`, the node must push a _full update_ to the calling node, by sending a `POST /update/` request asynchronously after processing the greeting request.
-  
+
 Response is the same as for `GET /cluster/`.
-  
+
 * `POST /update/`
 
 Sends an _update_, asking the node to amend its information about files and attributes. POST body must be a JSON document:

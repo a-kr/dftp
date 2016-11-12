@@ -18,6 +18,8 @@ var (
 	optMyNodeName    = flag.String("node-name", "", "node name to use instead of hostname")
 	optHttpAddr      = flag.String("http-listen", ":7040", "host:port for public HTTP interface to listen on")
 	optFtpAddr       = flag.String("ftp-listen", ":2121", "host:port for public FTP interface to listen on")
+	optMulticastAddr = flag.String("multicast-discovery-addr", "224.0.0.9:7041", "host:port for multicast peer discovery address")
+	optClusterName   = flag.String("cluster-name", "dftp", "cluster name (change it to allow multiple separate clusters work with same multicast discovery address)")
 	optHttpMgmtAddr  = flag.String("http-mgmt-listen", ":7041", "host:port for private cluster management HTTP interface to listen on")
 )
 
@@ -40,7 +42,7 @@ func main() {
 	localfs := localfs.NewLocalFs(*optDfsRoot, *optDfsMountPoint, dfs, myNodeName)
 	localfs.ScanOnce()
 
-	cluster := cluster.New(dfs, localfs, *optHttpAddr, *optHttpMgmtAddr)
+	cluster := cluster.New(dfs, localfs, *optClusterName, *optHttpAddr, *optHttpMgmtAddr, *optMulticastAddr)
 	go cluster.ServeHttp(*optHttpMgmtAddr)
 
 	if *optHttpAddr != "" {

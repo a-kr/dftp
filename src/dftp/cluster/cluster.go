@@ -27,6 +27,7 @@ type Cluster struct {
 }
 
 type PublicClusterInfo struct {
+	Name string
 	Me    *NodeInfo
 	Peers map[string]*NodeInfo
 }
@@ -57,8 +58,9 @@ func (n *NodeInfo) GetName() string {
 	return n.Name
 }
 
-func New(dfs *dfsfat.TreeNode, localfs *localfs.LocalFs, publicAddr string, mgmtAddr string) *Cluster {
+func New(dfs *dfsfat.TreeNode, localfs *localfs.LocalFs, clusterName string, publicAddr string, mgmtAddr string, multicastAddr string) *Cluster {
 	c := &Cluster{}
+	c.Name = clusterName
 	c.DfsRoot = dfs
 	c.LocalFs = localfs
 	c.Proxy = NewProxy(c, localfs)
@@ -70,5 +72,22 @@ func New(dfs *dfsfat.TreeNode, localfs *localfs.LocalFs, publicAddr string, mgmt
 		LastAlive:  time.Now().Unix(),
 	}
 	c.client = httputils.MakeTimeoutingHttpClient(10 * time.Second)
+	if multicastAddr != "" {
+		c.StartMulticastDiscovery(multicastAddr)
+	}
 	return c
+}
+
+func (c *Cluster) KnownMgmtAdr(addr string) bool {
+	c.RLock()
+	defer c.RUnlock()
+	if c.Me.MgmtAddr == addr {
+		return true
+	}
+	for _, p := range c.Peers {
+		if p.MgmtAddr == addr {
+			return true
+		}
+	}
+	return false
 }
