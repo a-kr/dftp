@@ -135,7 +135,7 @@ Returned filenames start with "/" and are relative to the root directory of the 
 
 `dftp` supports automatic peer discovery via multicast, and manual discovery using `POST /join/` HTTP requests.
 
-Multicast discovery is enabled by default. Each node periodically (every minute) announces its name, management API address:port, and cluster name. When a node receives such announcement from a previously-unmet peer, the node _greets_ the peer (`POST /cluster/ request to peer's management API, which is detailed below).
+Multicast discovery is enabled by default. Each node periodically (every minute) announces its name, management API address:port, and cluster name. When a node receives such announcement from a previously-unmet peer, the node _greets_ the peer (`POST /cluster/` request to peer's management API, which is detailed below).
 
 Multicast address and port can be specified with `--multicast-discovery-addr` command line option. If for some reason you need to operate multiple separate clusters on the same address and port, you must specify a different `--cluster-name` for each cluster.
 
